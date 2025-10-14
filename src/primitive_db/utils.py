@@ -2,9 +2,9 @@
 """Вспомогательные функции для работы с метаданными и таблицами."""
 
 import json
-from pathlib import Path
 
-DATA_DIR = Path("data")
+from src.constants import DATA_DIR
+
 DATA_DIR.mkdir(exist_ok=True)
 
 
