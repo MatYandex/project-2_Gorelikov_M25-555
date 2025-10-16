@@ -90,6 +90,7 @@ project#2_<фамилия>_<группа>/
 │       ├── core.py
 │       ├── engine.py
 │       ├── main.py
+│       ├── parser.py
 │       └── utils.py
 ├── Makefile
 ├── pyproject.toml

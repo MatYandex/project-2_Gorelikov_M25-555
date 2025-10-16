@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Игровой цикл: парсинг команд и запуск функций."""
+"""Игровой цикл"""
 
 import shlex
 
@@ -18,13 +18,35 @@ from .core import (
     select,
     update,
 )
-from .parser import parse_set, parse_where
-from .utils import load_metadata, load_table_data, save_metadata, save_table_data
+from .parser import parse_insert, parse_set_where
+from .utils import (
+    load_metadata,
+    load_table_data,
+    save_metadata,
+    save_table_data,
+)
 
 
 def print_help() -> None:
     """Печатает список доступных команд."""
     print(HELP_TEXT)
+
+
+def check_args(args: list[str], min_len: int, command_name: str) -> bool:
+    """Проверяет минимальное количество аргументов для команды."""
+    if len(args) < min_len:
+        print(f"Укажите аргументы для команды {command_name}.")
+        return False
+    return True
+
+
+def find_keyword_index(args: list[str], keyword: str) -> int:
+    """Возвращает индекс ключевого слова в args или -1, если не найдено."""
+    keyword_lower = keyword.lower()
+    for i, arg in enumerate(args):
+        if arg.lower() == keyword_lower:
+            return i
+    return -1
 
 
 def run() -> None:
@@ -33,7 +55,11 @@ def run() -> None:
 
     while True:
         metadata = load_metadata(META_FILE)
-        user_input = prompt.string("Введите команду: ")
+        try:
+            user_input = prompt.string("Введите команду: ")
+        except Exception as e:
+            print(f"Ошибка ввода: {e}")
+            continue
 
         try:
             args = shlex.split(user_input)
@@ -44,57 +70,56 @@ def run() -> None:
         if not args:
             continue
 
-        command = args[0].lower()
+        args_lower = [a.lower() for a in args]
+        command = args_lower[0]
 
         try:
             if command == "create_table":
-                if len(args) < 2:
-                    print("Укажите имя таблицы и хотя бы один столбец.")
+                if not check_args(args, 2, "create_table"):
                     continue
                 metadata = create_table(metadata, args[1], args[2:])
                 save_metadata(META_FILE, metadata)
 
             elif command == "drop_table":
-                if len(args) < 2:
-                    print("Укажите имя таблицы.")
+                if not check_args(args, 2, "drop_table"):
                     continue
-                metadata = drop_table(metadata, args[1])
-                if metadata is not None:
+                result = drop_table(metadata, args[1])
+                if result is not None:
+                    metadata = result
                     save_metadata(META_FILE, metadata)
 
             elif command == "list_tables":
                 list_tables(metadata)
 
             elif command == "insert":
-                # insert into users values ("Sergei, Jr.", 28, true)
-                if len(args) < 4 or args[1].lower() != "into" or (
-                        args[3].lower() != "values"):
+                if (
+                        len(args) < 4
+                        or args_lower[1] != "into"
+                        or args_lower[3] != "values"
+                ):
                     print("Синтаксис: insert into <table> values (...)")
                     continue
+
                 table_name = args[2]
                 values_index = user_input.lower().find("values")
-                values_str = user_input[values_index + len("values"):].strip()
-                if values_str.startswith("(") and values_str.endswith(")"):
-                    values_str = values_str[1:-1]
-
-                raw_values = shlex.split(values_str)
-                values = [tok.rstrip(',') for tok in raw_values if tok != ","]
+                values_str = user_input[values_index + len("values"):]
+                values = parse_insert(values_str)
 
                 data = load_table_data(table_name)
                 data = insert(metadata, table_name, values, data)
                 save_table_data(table_name, data)
 
             elif command == "select":
-                # select from users [where age = 28]
-                if len(args) < 3 or args[1].lower() != "from":
+                if len(args) < 3 or args_lower[1] != "from":
                     print("Синтаксис: select from <table> [where ...]")
                     continue
+
                 table_name = args[2]
                 data = load_table_data(table_name)
 
                 where_clause = None
-                if len(args) > 3 and args[3].lower() == "where":
-                    where_clause = parse_where(args[4:])
+                if len(args) > 3 and args_lower[3] == "where":
+                    where_clause = parse_set_where(args[4:])
 
                 rows = select(data, where_clause)
                 if not rows:
@@ -108,38 +133,46 @@ def run() -> None:
                 print(table)
 
             elif command == "update":
-                # update users set age = 29 where name = "Sergei"
-                if len(args) < 5 or args[2].lower() != "set":
-                    print("Синтаксис: update <table>"
-                          " set <col>=<val> where <col>=<val>")
+                if len(args) < 5 or args_lower[2] != "set":
+                    print(
+                        "Синтаксис: update <table> set <col>=<val> "
+                        "where <col>=<val>"
+                    )
                     continue
+
                 table_name = args[1]
-                if "where" not in [x.lower() for x in args]:
+                where_index = find_keyword_index(args, "where")
+                if where_index == -1:
                     print("Отсутствует условие WHERE.")
                     continue
-                where_index = next(
-                    i for i, x in enumerate(args) if x.lower() == "where")
-                set_clause = parse_set(args[3:where_index])
-                where_clause = parse_where(args[where_index + 1:])
+
+                set_clause = parse_set_where(args[3:where_index])
+                where_clause = parse_set_where(args[where_index + 1:])
                 data = load_table_data(table_name)
                 data = update(data, set_clause, where_clause)
                 save_table_data(table_name, data)
 
             elif command == "delete":
-                # delete from users where ID = 1
-                if len(args) < 4 or args[1].lower() != "from" or (
-                        args[3].lower() != "where"):
-                    print("Синтаксис: delete from <table> where <col>=<val>")
+                if (
+                        len(args) < 4
+                        or args_lower[1] != "from"
+                        or args_lower[3] != "where"
+                ):
+                    print(
+                        "Синтаксис: delete from <table> "
+                        "where <col>=<val>"
+                    )
                     continue
+
                 table_name = args[2]
-                where_clause = parse_where(args[4:])
+                where_clause = parse_set_where(args[4:])
                 data = load_table_data(table_name)
-                data = delete(data, where_clause)
-                save_table_data(table_name, data)
+                result = delete(data, where_clause)
+                if result is not None:
+                    save_table_data(table_name, result)
 
             elif command == "info":
-                if len(args) < 2:
-                    print("Укажите имя таблицы.")
+                if not check_args(args, 2, "info"):
                     continue
                 table_name = args[1]
                 data = load_table_data(table_name)
@@ -154,6 +187,6 @@ def run() -> None:
             else:
                 print(f"Функции {command} нет. Попробуйте снова.")
 
-        except Exception:
-            # Ошибки обработаны в core.py и decorators.py.
+        except Exception as e:
+            print(f"Произошла ошибка: {e}")
             continue
