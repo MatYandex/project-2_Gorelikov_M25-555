@@ -18,32 +18,13 @@ from .core import (
     select,
     update,
 )
+from .parser import parse_set, parse_where
 from .utils import load_metadata, load_table_data, save_metadata, save_table_data
 
 
 def print_help() -> None:
     """Печатает список доступных команд."""
     print(HELP_TEXT)
-
-
-def parse_where(tokens: list[str]) -> dict:
-    """Парсит условие WHERE в формате col = value."""
-    if len(tokens) < 3 or tokens[1] != "=":
-        print("Некорректный синтаксис WHERE.")
-        return {}
-    col, _, val = tokens
-    val = val.strip('"') if val.startswith('"') and val.endswith('"') else val
-    return {col: val}
-
-
-def parse_set(tokens: list[str]) -> dict:
-    """Парсит условие SET в формате col = value."""
-    if len(tokens) < 3 or tokens[1] != "=":
-        print("Некорректный синтаксис SET.")
-        return {}
-    col, _, val = tokens
-    val = val.strip('"') if val.startswith('"') and val.endswith('"') else val
-    return {col: val}
 
 
 def run() -> None:
@@ -174,5 +155,5 @@ def run() -> None:
                 print(f"Функции {command} нет. Попробуйте снова.")
 
         except Exception:
-            # Ошибки уже обработаны в core.py и decorators.py
+            # Ошибки обработаны в core.py и decorators.py.
             continue
