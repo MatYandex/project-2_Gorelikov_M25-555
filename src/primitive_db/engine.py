@@ -2,9 +2,12 @@
 """Игровой цикл: парсинг команд и запуск функций."""
 
 import shlex
-from prettytable import PrettyTable
+
 import prompt
+from prettytable import PrettyTable
+
 from src.constants import HELP_TEXT, META_FILE
+
 from .core import (
     create_table,
     delete,
@@ -15,8 +18,7 @@ from .core import (
     select,
     update,
 )
-from .utils import load_metadata, load_table_data, save_metadata, \
-    save_table_data
+from .utils import load_metadata, load_table_data, save_metadata, save_table_data
 
 
 def print_help() -> None:
@@ -89,16 +91,13 @@ def run() -> None:
                     print("Синтаксис: insert into <table> values (...)")
                     continue
                 table_name = args[2]
-                # Находим "values" и берем всё после него
                 values_index = user_input.lower().find("values")
                 values_str = user_input[values_index + len("values"):].strip()
                 if values_str.startswith("(") and values_str.endswith(")"):
                     values_str = values_str[1:-1]
 
-                # Разбиваем с помощью shlex, чтобы учитывать кавычки и запятые
                 raw_values = shlex.split(values_str)
-                # Убираем запятые, которые остались как отдельные токены
-                values = [v for v in raw_values if v != ","]
+                values = [tok.rstrip(',') for tok in raw_values if tok != ","]
 
                 data = load_table_data(table_name)
                 data = insert(metadata, table_name, values, data)

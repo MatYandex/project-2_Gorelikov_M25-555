@@ -3,6 +3,7 @@
 
 import time
 from functools import wraps
+
 import prompt
 
 
@@ -22,8 +23,14 @@ def handle_db_errors(func):
             )
             raise
         except KeyError as e:
-            print(f"Ошибка: Таблица или столбец {e} не найден.")
+            msg = str(e).strip("'\"")
+            if msg in (
+                    "users", "orders", ...):
+                print(f"Ошибка: Таблица '{msg}' уже существует.")
+            else:
+                print(f"Ошибка: Таблица или столбец {msg} не найден.")
             raise
+
         except ValueError as e:
             print(f"Ошибка валидации: {e}")
             raise
